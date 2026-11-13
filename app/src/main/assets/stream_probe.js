@@ -5,6 +5,7 @@
   window.__idleArcStreamProbeInstalled = true;
   const safeSegments = new Set(['api','app','ws','websocket','socket','socket.io','events','event','stream','sse','broadcasting','channels','chat','dashboard','realtime','live','subscribe','notifications','updates','connect']);
   const safeKeys = new Set(['type','event','data','payload','action','channel','timestamp','state','status','message']);
+  const dataKeys = new Set(['character','characterId','character_id','level','experience','exp','gold','goldAmount','ruby','rubies','rubyAmount','arcstone','arcstones','arcstoneAmount','currentHealth','maxHealth','health','damage','attackDamage','monsterLevel','monster','inventory','items','equipment','pets','skills','progress','dashboard','balance','currency','amount','player','user','text','message','sender','channel','type','event','updated','status','data','payload']);
   function safeLocation(raw) {
     try {
       const u = new URL(String(raw), location.href);
@@ -41,7 +42,9 @@
         const c=channel.toLowerCase();
         topic=c.includes('chat')?'chat':c.includes('guild')?'guild':c.includes('dashboard')?'dashboard':c.includes('character')?'character':c.includes('combat')?'combat':c.includes('boss')?'boss':'other';
       }
-      return [event,scope,topic].join('|');
+      const fields=inner && typeof inner==='object' && !Array.isArray(inner)
+        ? Object.keys(inner).filter(k=>dataKeys.has(k)).sort().slice(0,16).join(',') : '';
+      return [event,scope,topic,fields].join('|');
     } catch (_) { return ''; }
   }
   function describe(data) {
@@ -65,10 +68,14 @@
         instance.addEventListener('open',()=>send(kind,'open',url));
         instance.addEventListener('error',()=>send(kind,'error',url));
         if(kind==='ws') instance.addEventListener('close',()=>send(kind,'close',url));
-        const seen=new Set();
+        // Repeated shapes must reappear in the timeline so they can be correlated with user actions.
+        // Bound diagnostic noise to one entry per signature per second, with at most 40 signatures.
+        const seen=new Map();
         function report(stage,data) {
-          const shape=describe(data), meta=metadata(data), signature=stage+'|'+shape+'|'+meta;
-          if(!seen.has(signature) && seen.size<40) { seen.add(signature); send(kind,stage,url,shape,meta); }
+          const shape=describe(data), meta=metadata(data), signature=stage+'|'+shape+'|'+meta, now=Date.now();
+          if(!seen.has(signature) && seen.size>=40) return;
+          if(seen.has(signature) && now-seen.get(signature)<1000) return;
+          seen.set(signature,now); send(kind,stage,url,shape,meta);
         }
         instance.addEventListener('message',function(event) { report('message',event.data); });
         if(kind==='ws') {

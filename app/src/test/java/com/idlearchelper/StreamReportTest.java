@@ -9,10 +9,11 @@ public class StreamReportTest {
         assertTrue(s.contains("WebSocket")); assertTrue(s.contains("json-object:data,event")); assertFalse(s.contains("_"));
     }
     @Test public void protocolMetadataIsLimitedToSafeCategories() {
-        String event=StreamReport.render("{\"kind\":\"ws\",\"stage\":\"sent\",\"location\":\"ws-eu.pusher.com/app/_\",\"shape\":\"json-object:data,event\",\"meta\":\"subscribe|private|chat\"}");
+        String event=StreamReport.render("{\"kind\":\"ws\",\"stage\":\"sent\",\"location\":\"ws-eu.pusher.com/app/_\",\"shape\":\"json-object:data,event\",\"meta\":\"subscribe|private|chat|channel\"}");
         assertNotNull(event); assertTrue(event.contains("ws-eu.pusher.com"));
-        assertTrue(event.contains("subscribe")); assertTrue(event.contains("private"));
-        assertNull(StreamReport.render("{\"kind\":\"ws\",\"stage\":\"message\",\"location\":\"idlearc.com/_\",\"shape\":\"json-object\",\"meta\":\"secret|private|chat\"}"));
+        assertTrue(event.contains("subscribe")); assertTrue(event.contains("private")); assertTrue(event.contains("поля данных: channel"));
+        assertNull(StreamReport.render("{\"kind\":\"ws\",\"stage\":\"message\",\"location\":\"idlearc.com/_\",\"shape\":\"json-object\",\"meta\":\"custom|private|other|password\"}"));
+        assertNull(StreamReport.render("{\"kind\":\"ws\",\"stage\":\"message\",\"location\":\"idlearc.com/_\",\"shape\":\"json-object\",\"meta\":\"secret|private|chat|\"}"));
         assertNull(StreamReport.render("{\"kind\":\"ws\",\"stage\":\"open\",\"location\":\"ws-user-secret.pusher.com/app/_\"}"));
     }
     @Test public void secretsAndUnexpectedValuesAreRejected() {
