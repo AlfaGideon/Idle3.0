@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
         content.addView(button("02   Данные персонажа",()->load("/api/dashboard")));
         content.addView(button("03   Конфигурация игры",()->load("/api/config/game")));
         content.addView(button("04   Запустить плавающее окно",this::startOverlay));
+        content.addView(button("05   Логи и диагностика",this::showLogs));
         content.addView(button("Остановить плавающее окно",()-> { stopService(new Intent(this,OverlayService.class)); toast("Окно остановлено"); }));
         TextView note=text("Окно обновляется каждые 30 секунд, пока включено. Поля выбираются в данных персонажа. Запросы только на чтение.",13,MUTED); note.setPadding(0,dp(10),0,dp(15)); content.addView(note);
         content.addView(button("Выйти из аккаунта",()->new AlertDialog.Builder(this).setTitle("Выйти?").setMessage("Локальные cookies IdleArc и выбранные поля будут удалены, плавающее окно остановится.").setNegativeButton("Отмена",null).setPositiveButton("Выйти",(d,w)-> { stopService(new Intent(this,OverlayService.class)); getPreferencesFile().edit().clear().apply(); CookieManager.getInstance().removeAllCookies(value -> CookieManager.getInstance().flush()); toast("Локальная сессия удалена"); }).show()));
@@ -69,24 +70,53 @@ public class MainActivity extends Activity {
     private void showLogin() {
         ++requestId; base("БЕЗОПАСНЫЙ ВХОД  •  IDLEARC.COM");
         TextView hint=text("Вход выполняется на официальном сайте. После входа нажмите «Готово». Пароль приложению не передаётся.",14,MUTED); hint.setPadding(0,0,0,dp(10)); content.addView(hint);
+        DiagnosticLog.add("Вход: открыта страница авторизации; Android API " + android.os.Build.VERSION.SDK_INT);
         // WebView must be visible and given a fixed height inside the scroll container.
         login=new WebView(this); login.getSettings().setJavaScriptEnabled(true); login.getSettings().setDomStorageEnabled(true); login.getSettings().setAllowFileAccess(false); login.getSettings().setAllowContentAccess(false); login.getSettings().setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         CookieManager.getInstance().setAcceptCookie(true); CookieManager.getInstance().setAcceptThirdPartyCookies(login,false);
         login.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, android.webkit.WebResourceRequest req) {
                 Uri u=req.getUrl(); if("https".equals(u.getScheme()) && ("idlearc.com".equalsIgnoreCase(u.getHost()) || "www.idlearc.com".equalsIgnoreCase(u.getHost()))) return false;
+                DiagnosticLog.add("Вход: внешний переход (открывается в браузере, сессия может не передаться)");
                 if ("https".equals(u.getScheme())) { try { startActivity(new Intent(Intent.ACTION_VIEW,u)); } catch(Exception ignored) {} } return true;
+            }
+            @Override public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                DiagnosticLog.add("Вход: загрузка " + DiagnosticLog.location(url));
+            }
+            @Override public void onPageFinished(WebView view, String url) {
+                String cookie = CookieManager.getInstance().getCookie(Api.BASE + "/api/dashboard");
+                DiagnosticLog.add("Вход: страница загружена " + DiagnosticLog.location(url) + "; cookie для dashboard " + (cookie == null || cookie.isEmpty() ? "нет" : "есть"));
+            }
+            @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame()) DiagnosticLog.add("Вход: ошибка WebView код " + error.getErrorCode() + ", " + DiagnosticLog.location(request.getUrl().toString()));
+            }
+            @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (request.isForMainFrame()) DiagnosticLog.add("Вход: HTTP " + response.getStatusCode() + ", " + DiagnosticLog.location(request.getUrl().toString()));
+            }
+            @Override public void onReceivedSslError(WebView view, SslErrorHandler handler, android.net.http.SslError error) {
+                DiagnosticLog.add("Вход: ошибка TLS код " + error.getPrimaryError() + "; соединение отменено");
+                handler.cancel();
             }
         });
         content.addView(login,new LinearLayout.LayoutParams(-1,dp(520))); login.loadUrl(Api.BASE+"/login");
-        bar.addView(button("Готово · проверить данные",()-> { CookieManager.getInstance().flush(); load("/api/dashboard"); })); bar.addView(button("Назад",this::showHome));
+        bar.addView(button("Готово · проверить данные",()-> { DiagnosticLog.add("Вход: нажата проверка dashboard"); CookieManager.getInstance().flush(); load("/api/dashboard"); }));
+        bar.addView(button("Логи и диагностика",()-> { CookieManager.getInstance().flush(); showLogs(); })); bar.addView(button("Назад",this::showHome));
     }
     private void load(String ep) {
         endpoint=ep; path=new JSONArray(); page=0; data=null; final int id=++requestId;
         base("ЗАГРУЗКА  •  "+(ep.contains("dashboard")?"ПЕРСОНАЖ":"КОНФИГУРАЦИЯ"));
         content.addView(text("Обращаемся к IdleArc…",16,MUTED)); bar.addView(button("На главную",this::showHome));
         executor.execute(()-> { try { Object result=Api.get(ep); runOnUiThread(()-> { if(!destroyed && id==requestId) { data=result; showNode(); } }); }
-            catch(Exception e) { String message=e.getMessage(); runOnUiThread(()-> { if(!destroyed && id==requestId) { content.removeAllViews(); TextView err=text("Не удалось загрузить данные\n\n"+message,16,TEXT); content.addView(err); content.addView(button("Повторить",()->load(ep))); if(ep.contains("dashboard")) content.addView(button("Войти",this::showLogin)); } }); } });
+            catch(Exception e) { String message=e.getMessage(); runOnUiThread(()-> { if(!destroyed && id==requestId) { content.removeAllViews(); TextView err=text("Не удалось загрузить данные\n\n"+message,16,TEXT); content.addView(err); content.addView(button("Повторить",()->load(ep))); if(ep.contains("dashboard")) content.addView(button("Войти",this::showLogin)); content.addView(button("Открыть логи",this::showLogs)); } }); } });
+    }
+    private void showLogs() {
+        ++requestId; base("ЛОГИ  •  ДИАГНОСТИКА ВХОДА");
+        TextView hint=text("Повторите попытку входа, затем скопируйте логи и отправьте их разработчику. Пароли, значения cookie, адреса с параметрами и ответы API не записываются. Логи хранятся только в памяти до закрытия процесса приложения.",13,MUTED); hint.setPadding(0,0,0,dp(14)); content.addView(hint);
+        TextView log=text(DiagnosticLog.snapshot(),13,TEXT); log.setTextIsSelectable(true); log.setPadding(dp(12),dp(12),dp(12),dp(12)); log.setBackground(shape(PANEL,12)); content.addView(log);
+        bar.addView(button("Скопировать логи",()-> { android.content.ClipboardManager clipboard=(android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE); clipboard.setPrimaryClip(ClipData.newPlainText("Idle Arc Helper — логи", DiagnosticLog.snapshot())); toast("Логи скопированы"); }));
+        bar.addView(button("Обновить логи",this::showLogs));
+        bar.addView(button("Очистить",()-> { DiagnosticLog.clear(); showLogs(); }));
+        bar.addView(button("На главную",this::showHome));
     }
     private JSONArray childPath(Object key) { JSONArray p=new JSONArray(); for(int i=0;i<path.length();i++) p.put(path.opt(i)); p.put(key); return p; }
     private void showNode() {
