@@ -50,6 +50,7 @@ final class HumanFormat {
         m.put("monster_material_requirements","Требования к материалам монстров"); m.put("quantity","Количество");
         m.put("slot","Ячейка"); m.put("tier","Качество"); m.put("tier_level","Уровень качества");
         // Dashboard names observed in the user's companion client; unknown fields are kept intact.
+        m.put("account_arcstone","Аркстоуны аккаунта"); m.put("arcstone","Аркстоуны"); m.put("account_arcstone_purchased_packs","Купленные наборы аркстоунов");
         m.put("goldAmount","Количество золота"); m.put("rubyAmount","Количество рубинов"); m.put("arcstoneAmount","Количество аркстоунов"); m.put("arcstonesAmount","Количество аркстоунов");
         m.put("petShardsAmount","Осколки питомцев"); m.put("elementalShardsAmount","Осколки стихий"); m.put("petEggsAmount","Яйца питомцев");
         m.put("currentHealth","Текущее здоровье"); m.put("currentHealthPercentage","Текущее здоровье, %");

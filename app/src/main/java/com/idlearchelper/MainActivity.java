@@ -49,6 +49,7 @@ public class MainActivity extends Activity {
         ++requestId; base("ВАШИ ДАННЫЕ  •  БЫСТРЫЙ ДОСТУП");
         TextView hero=text("Всё важное —\nповерх игры.",27,TEXT); hero.setTypeface(null,Typeface.BOLD); hero.setPadding(0,dp(10),0,dp(8)); content.addView(hero);
         TextView desc=text("Войдите в IdleArc, откройте данные персонажа и закрепите нужные показатели в плавающей панели.",15,MUTED); desc.setLineSpacing(dp(3),1); desc.setPadding(0,0,0,dp(24)); content.addView(desc);
+        content.addView(button("✦   Мастерская сборки",()->startActivity(new Intent(this,BuildStudioActivity.class))));
         content.addView(button("01   Войти в IdleArc",this::showLogin));
         content.addView(button("02   Данные персонажа",()->load("/api/dashboard")));
         content.addView(button("03   Конфигурация игры",()->load("/api/config/game")));
