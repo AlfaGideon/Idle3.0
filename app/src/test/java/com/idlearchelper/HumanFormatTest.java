@@ -9,14 +9,19 @@ public class HumanFormatTest {
     @Test public void knownAndUnknownNamesRemainDistinguishable() {
         assertEquals("Максимальное здоровье", HumanFormat.label("maxHealth"));
         assertTrue(HumanFormat.known("maxHealth"));
-        assertEquals("Без перевода: newStat", HumanFormat.label("newStat"));
+        assertEquals("Надетая экипировка", HumanFormat.label("characterEquippedItems"));
+        assertEquals("Количество золота", HumanFormat.label("goldAmount"));
+        assertEquals("Новый характеристика (автоматический перевод)", HumanFormat.label("newStat"));
         assertFalse(HumanFormat.known("newStat"));
-        assertEquals("Бонусные характеристики / Без перевода: newStat / #1", HumanFormat.labelPath(new JSONArray().put("bonusStats").put("newStat").put(0)));
+        assertTrue(HumanFormat.label("mysteryStat").contains("частичный перевод"));
+        assertEquals("Легендарный", HumanFormat.humanValue("rarity", "Legendary"));
+        assertEquals("Legendary", HumanFormat.humanValue("name", "Legendary"));
+        assertEquals("Бонусные характеристики / Новый характеристика (автоматический перевод) / #1", HumanFormat.labelPath(new JSONArray().put("bonusStats").put("newStat").put(0)));
     }
     @Test public void valuesRetainTypesAndExactJson() {
-        assertEquals("Да (true)", HumanFormat.humanValue(true));
-        assertEquals("Нет (false)", HumanFormat.humanValue(false));
-        assertEquals("Нет значения (null)", HumanFormat.humanValue(JSONObject.NULL));
+        assertEquals("Да", HumanFormat.humanValue(true));
+        assertEquals("Нет", HumanFormat.humanValue(false));
+        assertEquals("Нет значения", HumanFormat.humanValue(JSONObject.NULL));
         assertEquals("Пустая строка", HumanFormat.humanValue(""));
         assertEquals("\"a\\\"b\"", HumanFormat.jsonValue("a\"b"));
         assertEquals("1.25", HumanFormat.jsonValue(1.25));

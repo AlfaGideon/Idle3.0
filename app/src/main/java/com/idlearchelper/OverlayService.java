@@ -68,7 +68,7 @@ public class OverlayService extends Service {
     private void render(Object response) {
         body.removeAllViews(); JSONArray pins=MainActivity.pins(this);
         if(pins.length()==0) { body.addView(text("Выберите поля в разделе «Данные персонажа» приложения.",12,0xffc1ccdc)); }
-        for(int i=0;i<pins.length();i++) { JSONArray p=pins.optJSONArray(i); if(p==null) continue; Object v=Api.at(response,p); TextView name=text(HumanFormat.labelPath(p),11,0xffaab7c9); name.setPadding(0,dp(6),0,0); body.addView(name); String value=HumanFormat.humanValue(v); if(v instanceof JSONObject || v instanceof JSONArray) value="Поле изменилось — выберите заново"; if(value.length()>100) value=value.substring(0,100)+"…"; TextView line=text(value,15,Color.WHITE); line.setMaxLines(2); line.setTypeface(null,Typeface.BOLD); body.addView(line); }
+        for(int i=0;i<pins.length();i++) { JSONArray p=pins.optJSONArray(i); if(p==null) continue; Object v=Api.at(response,p); TextView name=text(HumanFormat.labelPath(p),11,0xffaab7c9); name.setPadding(0,dp(6),0,0); body.addView(name); Object last=p.length()>0?p.opt(p.length()-1):null; String value=last instanceof String ? HumanFormat.humanValue((String)last,v) : HumanFormat.humanValue(v); if(v instanceof JSONObject || v instanceof JSONArray) value="Поле изменилось — выберите заново"; if(value.length()>100) value=value.substring(0,100)+"…"; TextView line=text(value,15,Color.WHITE); line.setMaxLines(2); line.setTypeface(null,Typeface.BOLD); body.addView(line); }
         footer.setText("Обновлено " + DateFormat.getTimeInstance(DateFormat.SHORT).format(new Date()));
     }
     private void schedule() { if(alive) handler.postDelayed(next,30000); }
