@@ -1,13 +1,12 @@
 package com.idlearchelper;
 
-import android.webkit.CookieManager;
 import org.json.*;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-/** Read-only client. The WebView owns the session; only cookies for the exact site are sent. */
+/** HTTPS API client. Credentials are used only by /api/login; dashboard uses a Bearer token. */
 final class Api {
     static final String BASE = "https://idlearc.com";
     static Object get(String path) throws Exception {
@@ -16,10 +15,17 @@ final class Api {
         c.setInstanceFollowRedirects(false);
         c.setConnectTimeout(15000); c.setReadTimeout(20000);
         c.setRequestProperty("Accept", "application/json");
-        c.setRequestProperty("User-Agent", android.webkit.WebSettings.getDefaultUserAgent(App.context));
-        String cookie = CookieManager.getInstance().getCookie(BASE + path);
-        if (cookie != null) c.setRequestProperty("Cookie", cookie);
-        DiagnosticLog.add("API GET " + path + ": cookie для запроса " + (cookie == null || cookie.isEmpty() ? "нет" : "есть") + ", автоматические редиректы выключены");
+        c.setRequestProperty("User-Agent", "IdleArcHelper/1.2");
+        if (path.equals("/api/dashboard")) {
+            String token;
+            try { token = AuthStore.load(); } catch (Exception e) {
+                DiagnosticLog.add("API dashboard: не удалось открыть защищённую сессию");
+                throw new IOException("Не удалось открыть сессию. Войдите заново.");
+            }
+            DiagnosticLog.add("API GET /api/dashboard: Bearer-токен " + (token == null || token.isEmpty() ? "отсутствует" : "есть"));
+            if (token == null || token.isEmpty()) throw new IOException("Сначала войдите в аккаунт IdleArc.");
+            applyBearer(c, token);
+        } else DiagnosticLog.add("API GET /api/config/game: открытый запрос");
         try {
             int status = c.getResponseCode();
             String contentType = c.getContentType();
@@ -46,6 +52,50 @@ final class Api {
             }
         } catch (Exception e) {
             DiagnosticLog.add("API " + path + ": " + DiagnosticLog.errorType(e));
+            throw e;
+        } finally { c.disconnect(); }
+    }
+    static void applyBearer(HttpURLConnection c, String token) { c.setRequestProperty("Authorization", "Bearer " + token); }
+    static String login(String email, String password) throws Exception {
+        HttpURLConnection c = (HttpURLConnection) new URL(BASE + "/api/login").openConnection();
+        return loginWithConnection(c, email, password);
+    }
+    static String loginWithConnection(HttpURLConnection c, String email, String password) throws Exception {
+        c.setInstanceFollowRedirects(false);
+        c.setConnectTimeout(15000); c.setReadTimeout(20000);
+        c.setRequestMethod("POST"); c.setDoOutput(true);
+        c.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        c.setRequestProperty("Accept", "application/json");
+        c.setRequestProperty("User-Agent", "IdleArcHelper/1.2");
+        DiagnosticLog.add("API POST /api/login: начало входа");
+        try {
+            JSONObject body = new JSONObject();
+            body.put("email", email); body.put("password", password); body.put("device_name", "IdleArc Helper");
+            byte[] payload = body.toString().getBytes(StandardCharsets.UTF_8);
+            c.setFixedLengthStreamingMode(payload.length);
+            try (OutputStream out = c.getOutputStream()) { out.write(payload); }
+            int status = c.getResponseCode();
+            DiagnosticLog.add("API /api/login: HTTP " + status + ", тип " + DiagnosticLog.contentType(c.getContentType()));
+            if (status != 200 && status != 201) {
+                if (status == 401 || status == 422) throw new IOException("Не удалось войти (HTTP " + status + "). Проверьте email и пароль.");
+                throw new IOException("Ошибка входа: HTTP " + status + ". Попробуйте позже.");
+            }
+            byte[] buffer = new byte[4096]; int count; int size = 0;
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (InputStream in = c.getInputStream()) {
+                while ((count = in.read(buffer)) != -1) {
+                    size += count; if (size > 1_000_000) throw new IOException("Ответ входа слишком большой.");
+                    bytes.write(buffer, 0, count);
+                }
+            }
+            JSONObject result = new JSONObject(new String(bytes.toByteArray(), StandardCharsets.UTF_8));
+            String token = result.optString("token", "").trim();
+            if (token.isEmpty() || token.length() > 8192 || token.indexOf('\n') >= 0 || token.indexOf('\r') >= 0)
+                throw new IOException("Сервер не вернул корректный токен.");
+            DiagnosticLog.add("API /api/login: токен получен");
+            return token;
+        } catch (Exception e) {
+            DiagnosticLog.add("API /api/login: " + DiagnosticLog.errorType(e));
             throw e;
         } finally { c.disconnect(); }
     }
