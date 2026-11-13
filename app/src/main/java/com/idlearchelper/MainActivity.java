@@ -120,7 +120,7 @@ public class MainActivity extends Activity {
     private void showNode() {
         base((endpoint.contains("dashboard")?"ПЕРСОНАЖ":"КОНФИГУРАЦИЯ")+"  •  "+(path.length()==0?"ОБЗОР":Api.label(path)));
         Object node=Api.at(data,path);
-        TextView hint=text(endpoint.contains("dashboard")?"Откройте раздел. Нажмите на значение, чтобы добавить его в окно (до 8 полей).":"Откройте раздел, чтобы изучить значения игровой конфигурации.",13,MUTED); hint.setPadding(0,0,0,dp(14)); content.addView(hint);
+        TextView hint=text(endpoint.contains("dashboard")?"Откройте раздел или нажмите на значение, чтобы увидеть подробности и закрепить его в окне.":"Откройте раздел или нажмите на значение, чтобы увидеть подробности. Изменение на сервере не поддерживается.",13,MUTED); hint.setPadding(0,0,0,dp(14)); content.addView(hint);
         if(node instanceof JSONObject) {
             JSONObject obj=(JSONObject)node; List<String> keys=new ArrayList<>(); Iterator<String> it=obj.keys(); while(it.hasNext()) keys.add(it.next()); Collections.sort(keys,String.CASE_INSENSITIVE_ORDER);
             if(keys.isEmpty()) content.addView(text("Нет данных",15,MUTED));
@@ -144,12 +144,25 @@ public class MainActivity extends Activity {
     }
     private void addRow(String key,Object value,JSONArray target) {
         boolean group=value instanceof JSONObject || value instanceof JSONArray;
-        String summary=group ? (value instanceof JSONObject ? ((JSONObject)value).length()+" полей" : ((JSONArray)value).length()+" элементов")+"  ›" : Api.value(value);
+        String summary=group ? (value instanceof JSONObject ? ((JSONObject)value).length()+" полей" : ((JSONArray)value).length()+" элементов")+"  ›" : HumanFormat.humanValue(value);
         if(summary.length()>160) summary=summary.substring(0,160)+"…";
         LinearLayout row=new LinearLayout(this); row.setOrientation(LinearLayout.VERTICAL); row.setPadding(dp(15),dp(12),dp(15),dp(12)); row.setBackground(shape(PANEL,12));
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2); lp.bottomMargin=dp(7); content.addView(row,lp);
-        TextView name=text(key.replace('_',' ')+(endpoint.contains("dashboard")&&!group&&pinned(target)?"  ★":""),14,GOLD); name.setTypeface(null,Typeface.BOLD); row.addView(name); TextView val=text(summary,15,TEXT); val.setPadding(0,dp(4),0,0); row.addView(val);
-        row.setOnClickListener(v->{ if(group) { path=target; page=0; showNode(); } else if(endpoint.contains("dashboard")) togglePin(target); });
+        String label=key.startsWith("#") ? "Элемент " + key : HumanFormat.label(key);
+        TextView name=text(label+(endpoint.contains("dashboard")&&!group&&pinned(target)?"  ★":""),14,GOLD); name.setTypeface(null,Typeface.BOLD); row.addView(name);
+        if (!key.startsWith("#")) { TextView raw=text("JSON: " + key,11,MUTED); row.addView(raw); }
+        TextView val=text(summary,15,TEXT); val.setPadding(0,dp(4),0,0); row.addView(val);
+        row.setOnClickListener(v->{ if(group) { path=target; page=0; showNode(); } else showField(key,value,target); });
+    }
+    private void showField(String key, Object value, JSONArray target) {
+        String title=key.startsWith("#") ? "Элемент " + key : HumanFormat.label(key);
+        String detail="Поле: " + Api.label(target) + "\nТип: " + HumanFormat.type(value)
+                + "\n\nЗначение: " + HumanFormat.humanValue(value)
+                + "\n\nJSON: " + HumanFormat.jsonValue(value)
+                + "\n\nТолько просмотр: API изменения этого параметра не предоставлен.";
+        AlertDialog.Builder dialog=new AlertDialog.Builder(this).setTitle(title).setMessage(detail).setNegativeButton("Закрыть",null);
+        if(endpoint.contains("dashboard")) dialog.setPositiveButton(pinned(target)?"Убрать из окна":"В плавающее окно",(d,w)->togglePin(target));
+        dialog.show();
     }
     private void startOverlay() {
         if(!Settings.canDrawOverlays(this)) { toast("Разрешите отображение поверх других приложений, затем нажмите кнопку ещё раз"); startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:"+getPackageName()))); return; }
