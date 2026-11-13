@@ -54,7 +54,8 @@ public class MainActivity extends Activity {
         content.addView(button("03   Конфигурация игры",()->load("/api/config/game")));
         content.addView(button("04   Запустить плавающее окно",this::startOverlay));
         content.addView(button("05   Логи и диагностика",this::showLogs));
-        content.addView(button("06   Сканирование онлайн-потока",()->startActivity(new Intent(this,StreamScannerActivity.class))));
+        content.addView(button("06   Arcstone Ascent · онлайн",()->startActivity(new Intent(this,LiveAscentActivity.class))));
+        content.addView(button("07   Сканирование онлайн-потока",()->startActivity(new Intent(this,StreamScannerActivity.class))));
         content.addView(button("Остановить плавающее окно",()-> { stopService(new Intent(this,OverlayService.class)); toast("Окно остановлено"); }));
         TextView note=text("Окно обновляется каждые 30 секунд, пока включено. Поля выбираются в данных персонажа. Запросы только на чтение.",13,MUTED); note.setPadding(0,dp(10),0,dp(15)); content.addView(note);
         content.addView(button("Выйти из аккаунта",()->new AlertDialog.Builder(this).setTitle("Выйти?").setMessage("Локальный токен и выбранные поля будут удалены, плавающее окно остановится. Серверный токен не отзывается автоматически.").setNegativeButton("Отмена",null).setPositiveButton("Выйти",(d,w)-> { stopService(new Intent(this,OverlayService.class)); getPreferencesFile().edit().clear().apply(); data=null; try { AuthStore.clear(); DiagnosticLog.add("Сессия: локальный токен удалён"); toast("Локальная сессия удалена"); } catch(Exception e) { DiagnosticLog.add("Сессия: ошибка удаления локального токена"); toast("Ошибка удаления сессии. Повторите выход."); } CookieManager.getInstance().removeAllCookies(value -> CookieManager.getInstance().flush()); }).show()));

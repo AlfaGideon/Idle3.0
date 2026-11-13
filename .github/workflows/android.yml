@@ -19,6 +19,7 @@ jobs:
         with:
           gradle-version: '8.9'
       - run: node tests/stream_probe_test.js
+      - run: node tests/ascent_live_test.js
       - run: gradle --no-daemon testDebugUnitTest assembleDebug
       - uses: actions/upload-artifact@v4
         with:
