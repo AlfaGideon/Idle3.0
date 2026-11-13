@@ -18,8 +18,17 @@
       return origin + '/' + parts.join('/');
     } catch (_) { return 'unknown/'; }
   }
-  function send(kind, stage, raw, shape, metadata) {
-    try { window.IdleArcStreamProbe.postMessage(JSON.stringify({kind:kind, stage:stage, location:safeLocation(raw), shape:shape || '', meta:metadata || ''})); } catch (_) { }
+  function send(kind, stage, raw, shape, metadata, payload) {
+    try {
+      const item={kind:kind, stage:stage, location:safeLocation(raw), shape:shape || '', meta:metadata || ''};
+      if(window.__idleArcProbeDetailed === true) {
+        if(stage==='created' || stage==='open') { try { item.host=new URL(String(raw), location.href).host; } catch (_) {} }
+        // Only incoming custom events. Never record subscription requests, authentication or handshake payloads.
+        if(stage==='message' && kind==='ws' && metadata && metadata.startsWith('custom|') && typeof payload==='string')
+          item.payload=payload.length<=20000 ? payload : '[сообщение слишком большое]';
+      }
+      window.IdleArcStreamProbe.postMessage(JSON.stringify(item));
+    } catch (_) { }
   }
   // Only predefined protocol names and channel categories leave the page; no event values or channel IDs.
   function metadata(data) {
@@ -75,7 +84,7 @@
           const shape=describe(data), meta=metadata(data), signature=stage+'|'+shape+'|'+meta, now=Date.now();
           if(!seen.has(signature) && seen.size>=40) return;
           if(seen.has(signature) && now-seen.get(signature)<1000) return;
-          seen.set(signature,now); send(kind,stage,url,shape,meta);
+          seen.set(signature,now); send(kind,stage,url,shape,meta,data);
         }
         instance.addEventListener('message',function(event) { report('message',event.data); });
         if(kind==='ws') {

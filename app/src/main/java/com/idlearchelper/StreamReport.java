@@ -3,14 +3,15 @@ package com.idlearchelper;
 import org.json.JSONObject;
 import java.util.*;
 
-/** Strict native allowlists: no raw URL, response, header, cookie or event content reaches logs. */
+/** Strict metadata allowlists; optional incoming event content is scrubbed before it reaches logs. */
 final class StreamReport {
     private static final Set<String> SEGMENTS = new HashSet<>(Arrays.asList("api","app","ws","websocket","socket","socket.io","events","event","stream","sse","broadcasting","channels","chat","dashboard","realtime","live","subscribe","notifications","updates","connect","_"));
     private static final Set<String> SHAPES = new HashSet<>(Arrays.asList("binary","large-text","json-null","json-array","json-scalar","json-object","text"));
     private static final Set<String> KEYS = new HashSet<>(Arrays.asList("type","event","data","payload","action","channel","timestamp","state","status","message"));
     private static final Set<String> DATA_KEYS = new HashSet<>(Arrays.asList("character","characterId","character_id","level","experience","exp","gold","goldAmount","ruby","rubies","rubyAmount","arcstone","arcstones","arcstoneAmount","currentHealth","maxHealth","health","damage","attackDamage","monsterLevel","monster","inventory","items","equipment","pets","skills","progress","dashboard","balance","currency","amount","player","user","text","message","sender","channel","type","event","updated","status","data","payload"));
-    static String render(String raw) {
-        if (raw == null || raw.length() > 1024) return null;
+    static String render(String raw) { return render(raw, false); }
+    static String render(String raw, boolean detailed) {
+        if (raw == null || raw.length() > 40000) return null;
         try {
             JSONObject obj=new JSONObject(raw);
             String kind=obj.optString("kind"), stage=obj.optString("stage"), location=obj.optString("location"), shape=obj.optString("shape"), meta=obj.optString("meta");
@@ -28,7 +29,12 @@ final class StreamReport {
             if(probe) return "Сканирование началось: " + display;
             String label=kind.equals("ws") ? "WebSocket" : kind.equals("sse") ? "EventSource (SSE)" : kind.equals("fetch") ? "SSE через fetch" : "SSE через XHR";
             String description=stage.equals("created")?"создано":stage.equals("open")?"подключено":stage.equals("error")?"ошибка":stage.equals("close")?"закрыто":stage.equals("stream")?"поток обнаружен":stage.equals("sent")?"отправлено":"сообщение";
-            return label + ": " + description + " — " + display + (shape.isEmpty()?"":"; формат: " + shape) + describeMetadata(meta);
+            String result=label + ": " + description + " — " + display + (shape.isEmpty()?"":"; формат: " + shape) + describeMetadata(meta);
+            if(detailed && kind.equals("ws") && (stage.equals("created") || stage.equals("open")) && obj.has("host"))
+                result += "; адрес сервера: " + DetailSanitizer.host(obj.optString("host"));
+            if(detailed && kind.equals("ws") && stage.equals("message") && meta.startsWith("custom|") && obj.has("payload"))
+                result += "\n  ДАННЫЕ (проверьте перед отправкой): " + DetailSanitizer.clean(obj.optString("payload"));
+            return result;
         } catch(Exception ignored) { return null; }
     }
     private static boolean safeMetadata(String meta) {

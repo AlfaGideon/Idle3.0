@@ -51,5 +51,14 @@ setImmediate(()=>{
   assert(events.some(e=>e.kind==='fetch' && e.stage==='stream'));
   assert(events.some(e=>e.kind==='xhr' && e.stage==='stream'));
   assert(!JSON.stringify(events).includes('secret'));
+  // Detailed capture is explicitly enabled; native code scrubs it before the report is stored.
+  window.__idleArcProbeDetailed=true;
+  const detail=new window.WebSocket('wss://socket.example.com/app/hidden-key?token=secret');
+  detail.send(JSON.stringify({event:'pusher:subscribe',data:{channel:'private-test',auth:'secret-auth'}}));
+  detail.emit('message',JSON.stringify({event:'pusher:connection_established',data:'secret-handshake'}));
+  detail.emit('message',JSON.stringify({event:'GameUpdated',data:{level:5}}));
+  assert.equal(events.find(e=>e.host==='socket.example.com').location,'external/app/_');
+  assert(events.some(e=>e.payload && e.payload.includes('GameUpdated')));
+  assert(!events.some(e=>e.payload && (e.payload.includes('secret-auth') || e.payload.includes('secret-handshake'))));
   console.log('stream probe tests passed');
 });
